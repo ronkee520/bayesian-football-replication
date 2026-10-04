@@ -1,0 +1,12 @@
+model: basic
+profile: modernized
+data_path: data/raw/epl_2023_24.csv
+seed: 20261004
+sampler:
+  warmup: 100
+  samples: 100
+  chains: 1
+  target_accept: 0.85
+  chain_method: sequential
+  progress_bar: false
+output_dir: results/quick_smoke

@@ -1,0 +1,30 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.venv/
+.uv-cache/
+.idea/
+.vscode/
+.DS_Store
+
+# Generated analysis artifacts. Keep directory documentation tracked.
+data/processed/*
+!data/processed/.gitkeep
+results/*
+!results/README.md
+!results/figures/
+!results/tables/
+!results/diagnostics/
+results/figures/*
+!results/figures/.gitkeep
+results/tables/*
+!results/tables/.gitkeep
+results/diagnostics/*
+!results/diagnostics/.gitkeep
+results/posterior/
+
+# Notebook checkpoints and local logs.
+.ipynb_checkpoints/
+*.log

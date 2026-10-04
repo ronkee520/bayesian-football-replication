@@ -1,0 +1,11 @@
+model: basic
+profile: paper_replication
+data_path: data/raw/epl_2023_24.csv
+seed: 20261004
+sampler:
+  warmup: 1500
+  samples: 2000
+  chains: 4
+  target_accept: 0.90
+  chain_method: sequential
+output_dir: results/basic_paper_replication

@@ -1,0 +1,13 @@
+model: basic
+profile: modernized
+data_path: data/raw/epl_2023_24.csv
+seed: 20261004
+holdout_rounds: 6
+posterior_predictive_draws: 2000
+sampler:
+  warmup: 1000
+  samples: 1500
+  chains: 4
+  target_accept: 0.90
+  chain_method: sequential
+output_dir: results/holdout_basic_modernized

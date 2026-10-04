@@ -1,0 +1,23 @@
+cff-version: 1.2.0
+message: "If you use this repository, please cite both this software and Baio & Blangiardo (2010)."
+title: "Bayesian Football Model Replication"
+type: software
+version: 0.1.0
+date-released: 2026-10-04
+authors:
+  - name: ronkee520
+preferred-citation:
+  type: article
+  title: "Bayesian hierarchical model for the prediction of football results"
+  authors:
+    - family-names: Baio
+      given-names: Gianluca
+    - family-names: Blangiardo
+      given-names: Marta
+  journal: "Journal of Applied Statistics"
+  volume: 37
+  issue: 2
+  start: 253
+  end: 264
+  year: 2010
+  doi: 10.1080/02664760802684177
