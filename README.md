@@ -187,7 +187,7 @@ Nottingham Forest 的行政扣分。
 uv run pytest -m "not slow"
 ```
 
-当前版本的正确结果是 `7 passed, 4 deselected`。
+当前版本的正确结果是 `8 passed, 4 deselected`。
 
 随后运行包括四个微型 NUTS 拟合在内的全部测试：
 
@@ -195,7 +195,7 @@ uv run pytest -m "not slow"
 uv run pytest
 ```
 
-当前版本的正确结果是 `11 passed`。第一次运行 JAX 时需要编译，耗时会比后续运行长。
+当前版本的正确结果是 `12 passed`。第一次运行 JAX 时需要编译，耗时会比后续运行长。
 
 再执行代码质量检查：
 
@@ -408,7 +408,7 @@ uv run pytest
 uv run ruff check .
 ```
 
-For the current version, the expected results are 7 fast tests passed, 11 total
+For the current version, the expected results are 8 fast tests passed, 12 total
 tests passed, and `All checks passed!` from Ruff.
 
 #### 3.6 Run end-to-end smoke checks
