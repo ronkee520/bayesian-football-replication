@@ -32,24 +32,28 @@ in Baio and Blangiardo (2010) using the 2023/24 English Premier League season.
 
 ### 2. 模型概览
 
-对于比赛 \(g\)，主队和客队进球分别建模为：
+对于比赛 $g$，主队和客队进球分别建模为：
 
-\[
+$$
 y_{g,h}\sim\operatorname{Poisson}(\theta_{g,h}),\qquad
 y_{g,a}\sim\operatorname{Poisson}(\theta_{g,a}).
-\]
+$$
 
 基础模型使用：
 
-\[
+$$
 \log\theta_{g,h}
 =\text{home}+\text{attack}_{h(g)}+\text{defence}_{a(g)},
-\]
+$$
 
-\[
+$$
 \log\theta_{g,a}
 =\text{attack}_{a(g)}+\text{defence}_{h(g)}.
-\]
+$$
+
+其中，$h(g)$ 和 $a(g)$ 分别表示比赛 $g$ 的主队和客队；
+$\text{home}$ 是整体主场优势；$\text{attack}_t$ 与
+$\text{defence}_t$ 分别是球队 $t$ 相对于联赛平均水平的进攻和防守效应。
 
 混合模型将球队效应的单一总体分布替换为弱、中、强三个 Student-t 成分。
 离散分组变量已经边缘化，因此可以直接使用 NumPyro NUTS 对连续后验进行采样。
