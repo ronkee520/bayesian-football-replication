@@ -187,7 +187,7 @@ Nottingham Forest 的行政扣分。
 uv run pytest -m "not slow"
 ```
 
-当前版本的正确结果是 `8 passed, 4 deselected`。
+当前版本的正确结果是 `10 passed, 4 deselected`。
 
 随后运行包括四个微型 NUTS 拟合在内的全部测试：
 
@@ -195,7 +195,7 @@ uv run pytest -m "not slow"
 uv run pytest
 ```
 
-当前版本的正确结果是 `12 passed`。第一次运行 JAX 时需要编译，耗时会比后续运行长。
+当前版本的正确结果是 `14 passed`。第一次运行 JAX 时需要编译，耗时会比后续运行长。
 
 再执行代码质量检查：
 
@@ -290,6 +290,79 @@ uv run python scripts/run_holdout.py --config configs/holdout_modernized.yaml
 
 不同 CPU、JAX 版本和浮点实现可能带来很小的数值差异。正确复现强调后验分布、
 诊断结论和预测指标在 Monte Carlo 误差范围内一致，而不是要求每一个小数完全相同。
+
+#### 4.11 生成汇总表和可视化结果
+
+完成至少一个正式的全赛季模型拟合后，运行：
+
+```bash
+uv run python scripts/summarize_results.py
+```
+
+该命令默认自动发现完整结果，并排除所有 `quick_smoke` 目录，以免把流程测试的小样本
+当作正式研究结论。完成后首先打开：
+
+```text
+results/summary.md
+```
+
+主要输出包括：
+
+| 文件 | 内容 |
+| --- | --- |
+| `results/tables/model_comparison.csv` | MAE、RMSE、预测区间覆盖率、divergence、R-hat、ESS 和 BFMI |
+| `results/tables/posterior_parameter_summary.csv` | 主场优势、模型超参数以及各球队攻防能力的后验摘要 |
+| `results/diagnostics/convergence_summary.csv` | 可解释参数的逐项收敛诊断及自动检查状态 |
+| `results/figures/model_comparison.png` | 预测表现与采样质量的综合比较 |
+| `results/figures/observed_vs_predicted_points.png` | 实际积分、预测均值及 90% 预测区间 |
+| `results/figures/team_prediction_errors.png` | 各球队预测误差及模型间比较 |
+| `results/figures/convergence_overview.png` | 两个正式模型的四链 MCMC 收敛总览 |
+| `results/figures/attack_effects_*.png` | 球队进攻效应及 90% 后验区间 |
+| `results/figures/defence_effects_*.png` | 球队防守效应及 90% 后验区间 |
+| `results/figures/trace_*.png` | 关键参数和代表性球队的 MCMC 轨迹图 |
+| `results/figures/rank_*.png` | 不同链是否均匀探索后验分布的 rank plot |
+
+如需明确指定要比较的运行目录，可使用：
+
+```bash
+uv run python scripts/summarize_results.py --runs results/basic_paper_replication results/mixture_paper_replication
+```
+
+`trace` 和 `rank` 图只选择主场优势、总体尺度或混合成分以及强弱代表球队；逐场期望
+进球等数百个派生参数仍保存在数据文件中，但不会全部绘图。轨迹图需要和 R-hat、
+ESS、divergence 及 BFMI 一起判断，不能单独作为收敛证明。
+
+#### 4.12 从全新克隆到完整结果的最短路径
+
+其他人在 GitHub 克隆本仓库并进入项目根目录后，可以按顺序直接运行：
+
+```bash
+uv sync --extra dev --frozen
+uv run python scripts/validate_data.py
+uv run pytest
+uv run python scripts/run_model.py --config configs/basic_paper_replication.yaml
+uv run python scripts/run_model.py --config configs/mixture_paper_replication.yaml
+uv run python scripts/summarize_results.py
+```
+
+最后一条命令必须在两次正式拟合完成后执行。成功时终端会显示
+`Generated 16 summary files from 2 fitted runs.`。随后打开 `results/summary.md`，并确认
+`results/figures/` 中存在 `convergence_overview.png`、两个 `trace_*.png` 和两个
+`rank_*.png`。`quick_smoke` 只有一条链，只能验证代码能够运行，不能生成有意义的
+多链收敛判断。
+
+仓库不会预先附带上述结果。完成命令后，用户会在自己的电脑上得到以下多链诊断图：
+
+```text
+results/figures/convergence_overview.png
+results/figures/trace_basic_paper_replication.png
+results/figures/trace_mixture_paper_replication.png
+results/figures/rank_basic_paper_replication.png
+results/figures/rank_mixture_paper_replication.png
+```
+
+其中，trace plot 使用不同颜色显示四条独立 MCMC 链；rank plot 用于检查各条链是否
+均匀探索同一个后验分布。这些文件均由本地后验样本即时生成，不是仓库内预置图片。
 
 ### 5. 常见问题
 
@@ -408,7 +481,7 @@ uv run pytest
 uv run ruff check .
 ```
 
-For the current version, the expected results are 8 fast tests passed, 12 total
+For the current version, the expected results are 10 fast tests passed, 14 total
 tests passed, and `All checks passed!` from Ruff.
 
 #### 3.6 Run end-to-end smoke checks
@@ -462,6 +535,55 @@ Small numerical differences across CPUs and JAX versions are normal. A correct
 reproduction requires substantively equivalent posterior distributions,
 diagnostics, and predictive metrics within Monte Carlo error; it does not require
 identical last decimal places.
+
+#### 3.10 Generate summary tables and figures
+
+After at least one completed full-season fit, run:
+
+```bash
+uv run python scripts/summarize_results.py
+```
+
+The command automatically discovers complete runs and excludes `quick_smoke`
+directories by default. Open `results/summary.md` first. It indexes the compact
+model-comparison table, posterior parameter summaries, convergence diagnostics,
+observed-versus-predicted plot, team error plot, attack/defence interval plots,
+and selected MCMC trace and rank plots.
+
+To select runs explicitly:
+
+```bash
+uv run python scripts/summarize_results.py --runs results/basic_paper_replication results/mixture_paper_replication
+```
+
+The trace and rank figures deliberately show a small set of interpretable latent
+parameters rather than hundreds of match-level deterministic quantities. Visual
+inspection must be combined with R-hat, ESS, divergences, and BFMI.
+
+#### 3.11 Shortest clean-clone reproduction path
+
+After cloning the repository and entering its root directory, run:
+
+```bash
+uv sync --extra dev --frozen
+uv run python scripts/validate_data.py
+uv run pytest
+uv run python scripts/run_model.py --config configs/basic_paper_replication.yaml
+uv run python scripts/run_model.py --config configs/mixture_paper_replication.yaml
+uv run python scripts/summarize_results.py
+```
+
+The last command must run after both four-chain fits have completed. It should
+report `Generated 16 summary files from 2 fitted runs.`. Open
+`results/summary.md`, then verify that `results/figures/` contains the compact
+convergence overview, two detailed trace plots, and two rank plots. Single-chain
+smoke runs only validate the pipeline and cannot establish multi-chain convergence.
+
+The repository intentionally ships without generated results. After running the
+commands, each user locally creates `convergence_overview.png`, the two detailed
+`trace_*.png` files, and the two `rank_*.png` files under `results/figures/`.
+Different trace colors represent the four independent MCMC chains; none of these
+images are pre-populated in the repository.
 
 ### 4. Reference
 

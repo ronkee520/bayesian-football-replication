@@ -10,3 +10,28 @@ Model runs create a dedicated subdirectory containing:
 
 Generated artifacts are ignored by Git because they can be large and are
 recreated from the tracked data, code, and configuration.
+
+## Summary report and figures
+
+After completing at least one full-season fit, run:
+
+```bash
+uv run python scripts/summarize_results.py
+```
+
+By default, this excludes all `quick_smoke` directories and creates:
+
+- `summary.md`: bilingual result index and model comparison;
+- `tables/model_comparison.csv`: compact predictive and sampler metrics;
+- `tables/posterior_parameter_summary.csv`: scalar and team-effect summaries;
+- `diagnostics/convergence_summary.csv`: interpretable-parameter R-hat, ESS, and status;
+- `figures/`: comparison, prediction, team-effect, trace, and rank plots.
+
+`figures/convergence_overview.png` is a compact four-chain trace figure suitable
+for reviewing the run. The per-model `trace_*.png` and `rank_*.png` files provide
+the detailed convergence views.
+
+This directory is intentionally empty in a fresh clone, apart from this README
+and `.gitkeep` placeholders. All posterior archives, summary tables, and figures
+are ignored by Git and must be generated locally from the tracked data, code,
+and configurations.

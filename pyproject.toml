@@ -29,6 +29,7 @@ dev = [
 [project.scripts]
 bayes-football-validate = "bayes_football.cli:validate_main"
 bayes-football-fit = "bayes_football.cli:fit_main"
+bayes-football-report = "bayes_football.reporting:report_main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/bayes_football"]

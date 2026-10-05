@@ -15,7 +15,7 @@ def save_diagnostics(mcmc, output_dir: str | Path) -> tuple[Path, Path]:
     destination = Path(output_dir)
     destination.mkdir(parents=True, exist_ok=True)
     inference_data = az.from_numpyro(mcmc)
-    summary = az.summary(inference_data, kind="diagnostics", round_to=None)
+    summary = az.summary(inference_data, kind="diagnostics", round_to=4)
     summary_path = destination / "diagnostics.csv"
     summary.to_csv(summary_path)
 

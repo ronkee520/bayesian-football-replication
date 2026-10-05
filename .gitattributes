@@ -1,5 +1,6 @@
 * text=auto eol=lf
-*.csv binary
+*.csv text eol=lf
+data/raw/*.csv binary
 *.py text eol=lf
 *.md text eol=lf
 *.toml text eol=lf

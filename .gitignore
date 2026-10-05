@@ -10,7 +10,7 @@ __pycache__/
 .vscode/
 .DS_Store
 
-# Generated analysis artifacts. Keep directory documentation tracked.
+# All generated analysis artifacts stay local and must be reproduced by the user.
 data/processed/*
 !data/processed/.gitkeep
 results/*
