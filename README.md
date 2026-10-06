@@ -186,7 +186,7 @@ Nottingham Forest 的行政扣分。
 uv run pytest -m "not slow"
 ```
 
-当前版本的正确结果是 `10 passed, 4 deselected`。
+当前版本的正确结果是 `13 passed, 4 deselected`。
 
 随后运行包括四个微型 NUTS 拟合在内的全部测试：
 
@@ -194,7 +194,7 @@ uv run pytest -m "not slow"
 uv run pytest
 ```
 
-当前版本的正确结果是 `14 passed`。第一次运行 JAX 时需要编译，耗时会比后续运行长。
+当前版本的正确结果是 `17 passed`。第一次运行 JAX 时需要编译，耗时会比后续运行长。
 
 再执行代码质量检查：
 
@@ -311,10 +311,15 @@ results/summary.md
 | --- | --- |
 | `results/tables/model_comparison.csv` | MAE、RMSE、预测区间覆盖率、divergence、R-hat、ESS 和 BFMI |
 | `results/tables/posterior_parameter_summary.csv` | 主场优势、模型超参数以及各球队攻防能力的后验摘要 |
+| `results/tables/paper_point_predictions.csv` | 基础模型与混合模型的球队积分预测及误差 |
+| `results/tables/mixture_membership_*.csv` | 混合模型的球队组分后验概率 |
 | `results/diagnostics/convergence_summary.csv` | 可解释参数的逐项收敛诊断及自动检查状态 |
 | `results/figures/model_comparison.png` | 预测表现与采样质量的综合比较 |
 | `results/figures/observed_vs_predicted_points.png` | 实际积分、预测均值及 90% 预测区间 |
 | `results/figures/team_prediction_errors.png` | 各球队预测误差及模型间比较 |
+| `results/figures/paper_cumulative_points.png` | 论文图 2/4 风格的 20 队累积积分及 90% 区间 |
+| `results/figures/paper_attack_defence_*.png` | 论文图 3 风格的攻防能力平面 |
+| `results/figures/paper_group_probabilities_*.png` | 论文图 5 风格的弱、中、强组分概率 |
 | `results/figures/convergence_overview.png` | 两个正式模型的四链 MCMC 收敛总览 |
 | `results/figures/attack_effects_*.png` | 球队进攻效应及 90% 后验区间 |
 | `results/figures/defence_effects_*.png` | 球队防守效应及 90% 后验区间 |
@@ -331,6 +336,12 @@ uv run python scripts/summarize_results.py --runs results/basic_paper_replicatio
 进球等数百个派生参数仍保存在数据文件中，但不会全部绘图。轨迹图需要和 R-hat、
 ESS、divergence 及 BFMI 一起判断，不能单独作为收敛证明。
 
+三类 `paper_*` 图借鉴 Baio 与 Blangiardo（2010）的图 2/4、图 3 和图 5，但不会
+复制旧课程项目中的图片或数值；脚本会用当前 NumPyro 后验重新计算全部曲线、区间
+和球队位置。当前混合模型已经把离散类别边际化，因此分组图展示后验组分责任概率，
+而不是不存在于 NUTS 样本中的离散标签频数。
+课程数据没有日期列，累积积分图沿用所跟踪 CSV 的行顺序作为比赛先后顺序。
+
 #### 4.12 从全新克隆到完整结果的最短路径
 
 其他人在 GitHub 克隆本仓库并进入项目根目录后，可以按顺序直接运行：
@@ -345,10 +356,10 @@ uv run python scripts/summarize_results.py
 ```
 
 最后一条命令在两次正式拟合完成后执行。成功时终端会显示
-`Generated 16 summary files from 2 fitted runs.`。随后打开 `results/summary.md`，并确认
-`results/figures/` 中存在 `convergence_overview.png`、两个 `trace_*.png` 和两个
-`rank_*.png`。`quick_smoke` 只有一条链，只能验证代码能够运行，不能生成有意义的
-多链收敛判断。
+`Generated 21 summary files from 2 fitted runs.`。随后打开 `results/summary.md`，并确认
+`results/figures/` 中存在三类 `paper_*` 图、`convergence_overview.png`、两个
+`trace_*.png` 和两个 `rank_*.png`。`quick_smoke` 只有一条链，只能验证代码能够运行，
+不能生成有意义的多链收敛判断。
 
 仓库不会预先附带上述结果。完成命令后，用户会在自己的电脑上得到以下多链诊断图：
 
@@ -547,7 +558,13 @@ The command automatically discovers complete runs and excludes `quick_smoke`
 directories by default. Open `results/summary.md` first. It indexes the compact
 model-comparison table, posterior parameter summaries, convergence diagnostics,
 observed-versus-predicted plot, team error plot, attack/defence interval plots,
-and selected MCMC trace and rank plots.
+paper-style cumulative-points, attack-defence, and mixture-group figures, and
+selected MCMC trace and rank plots. The `paper_*` figures follow the structure
+of Figures 2/4, 3, and 5 in Baio and Blangiardo (2010), while recomputing every
+value from the current NumPyro posterior. The group plot reports posterior
+component responsibilities because the discrete allocations are marginalized.
+The cumulative-points figure treats the tracked CSV row order as match order,
+because the course data do not contain a date column.
 
 To select runs explicitly:
 
@@ -573,16 +590,18 @@ uv run python scripts/summarize_results.py
 ```
 
 The last command runs after both four-chain fits have completed. It should
-report `Generated 16 summary files from 2 fitted runs.`. Open
+report `Generated 21 summary files from 2 fitted runs.`. Open
 `results/summary.md`, then verify that `results/figures/` contains the compact
-convergence overview, two detailed trace plots, and two rank plots. Single-chain
-smoke runs only validate the pipeline and cannot establish multi-chain convergence.
+convergence overview, the three paper-style figures, two detailed trace plots,
+and two rank plots. Single-chain smoke runs only validate the pipeline and cannot
+establish multi-chain convergence.
 
 The repository intentionally ships without generated results. After running the
-commands, each user locally creates `convergence_overview.png`, the two detailed
-`trace_*.png` files, and the two `rank_*.png` files under `results/figures/`.
-Different trace colors represent the four independent MCMC chains; none of these
-images are pre-populated in the repository.
+commands, each user locally creates the three paper-style figures,
+`convergence_overview.png`, the two detailed `trace_*.png` files, and the two
+`rank_*.png` files under `results/figures/`. Different trace colors represent
+the four independent MCMC chains; none of these images are pre-populated in the
+repository.
 
 ### 4. Reference
 

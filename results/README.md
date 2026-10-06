@@ -24,8 +24,16 @@ By default, this excludes all `quick_smoke` directories and creates:
 - `summary.md`: bilingual result index and model comparison;
 - `tables/model_comparison.csv`: compact predictive and sampler metrics;
 - `tables/posterior_parameter_summary.csv`: scalar and team-effect summaries;
+- `tables/paper_point_predictions.csv`: observed and predicted league points;
+- `tables/mixture_membership_*.csv`: posterior mixture-component responsibilities;
 - `diagnostics/convergence_summary.csv`: interpretable-parameter R-hat, ESS, and status;
-- `figures/`: comparison, prediction, team-effect, trace, and rank plots.
+- `figures/`: comparison, prediction, paper-style, team-effect, trace, and rank plots.
+
+The paper-style outputs reproduce the structure, not the stored values, of the
+published figures: `paper_cumulative_points.png` shows the 20 team trajectories,
+`paper_attack_defence_*.png` shows the team-effect plane, and
+`paper_group_probabilities_*.png` shows marginalized mixture responsibilities.
+Every image is regenerated from the current posterior samples.
 
 `figures/convergence_overview.png` is a compact four-chain trace figure suitable
 for reviewing the run. The per-model `trace_*.png` and `rank_*.png` files provide

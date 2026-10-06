@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -13,7 +14,8 @@ import numpy as np
 import pandas as pd
 import yaml
 
-from .data import load_season_csv
+from .data import SeasonData, load_season_csv
+from .prediction import simulate_scores
 
 REQUIRED_RUN_FILES = {
     "config_resolved.yaml",
@@ -35,6 +37,7 @@ class FittedRun:
     diagnostics: pd.DataFrame
     sampler: dict[str, Any]
     samples: dict[str, np.ndarray]
+    season: SeasonData
     teams: tuple[str, ...]
 
     @property
@@ -79,6 +82,7 @@ def load_fitted_run(path: str | Path, project_root: str | Path) -> FittedRun:
         diagnostics=pd.read_csv(run_path / "diagnostics.csv", index_col=0),
         sampler=json.loads((run_path / "sampler_diagnostics.json").read_text(encoding="utf-8")),
         samples=samples,
+        season=season,
         teams=season.teams,
     )
 
@@ -228,6 +232,326 @@ def _save_figure(fig, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, bbox_inches="tight", facecolor="white")
     _pyplot().close(fig)
+
+
+def _paper_comparison_runs(runs: list[FittedRun]) -> list[FittedRun]:
+    """Select one basic and one mixture run for uncluttered paper-style figures."""
+    selected = []
+    profile_order = {"paper_replication": 0, "modernized": 1}
+    for model in ("basic", "mixture"):
+        candidates = [run for run in runs if run.config["model"] == model]
+        if candidates:
+            selected.append(
+                min(candidates, key=lambda run: profile_order.get(run.config["profile"], 2))
+            )
+    return selected or runs[:2]
+
+
+def paper_point_comparison_table(runs: list[FittedRun]) -> pd.DataFrame:
+    """Create the paper-style observed-versus-predicted league table."""
+    selected = _paper_comparison_runs(runs)
+    first = selected[0].predictions.set_index("team")
+    comparison = first[["observed_on_field_points"]].rename(
+        columns={"observed_on_field_points": "observed_points"}
+    )
+    for run in selected:
+        table = run.predictions.set_index("team").reindex(comparison.index)
+        if table["predicted_points_mean"].isna().any():
+            raise ValueError("Selected runs do not contain the same teams")
+        prefix = _safe_name(run.name)
+        comparison[f"{prefix}_predicted_mean"] = table["predicted_points_mean"]
+        comparison[f"{prefix}_error"] = (
+            table["predicted_points_mean"] - comparison["observed_points"]
+        )
+    return comparison.reset_index().sort_values("observed_points", ascending=False)
+
+
+def _cumulative_points_from_scores(
+    data: SeasonData, home_scores: np.ndarray, away_scores: np.ndarray
+) -> np.ndarray:
+    """Return cumulative points by posterior draw, team, and team match number."""
+    home = np.asarray(home_scores)
+    away = np.asarray(away_scores)
+    if home.shape != away.shape or home.ndim != 2 or home.shape[1] != data.n_matches:
+        raise ValueError("Score arrays must have shape (draws, matches)")
+
+    matches_per_team = np.bincount(
+        np.concatenate([data.home_id, data.away_id]), minlength=data.n_teams
+    )
+    if not np.all(matches_per_team == matches_per_team[0]):
+        raise ValueError("Cumulative point plots require equal matches per team")
+
+    cumulative = np.empty((home.shape[0], data.n_teams, matches_per_team[0]), dtype=float)
+    totals = np.zeros((home.shape[0], data.n_teams), dtype=float)
+    played = np.zeros(data.n_teams, dtype=int)
+    for match, (home_team, away_team) in enumerate(
+        zip(data.home_id, data.away_id, strict=True)
+    ):
+        home_win = home[:, match] > away[:, match]
+        away_win = home[:, match] < away[:, match]
+        draw = ~(home_win | away_win)
+        totals[:, home_team] += 3 * home_win + draw
+        totals[:, away_team] += 3 * away_win + draw
+        cumulative[:, home_team, played[home_team]] = totals[:, home_team]
+        cumulative[:, away_team, played[away_team]] = totals[:, away_team]
+        played[home_team] += 1
+        played[away_team] += 1
+    return cumulative
+
+
+def plot_cumulative_points(runs: list[FittedRun], destination: Path) -> None:
+    """Recreate the paper's 20-team cumulative-points small multiples."""
+    plt = _pyplot()
+    selected = _paper_comparison_runs(runs)
+    season = selected[0].season
+    for run in selected[1:]:
+        if not run.season.frame.equals(season.frame):
+            raise ValueError("Cumulative point comparison requires identical match data")
+
+    observed = _cumulative_points_from_scores(
+        season, season.home_goals[None, :], season.away_goals[None, :]
+    )[0]
+    simulations: dict[str, tuple[np.ndarray, np.ndarray, np.ndarray]] = {}
+    for run in selected:
+        home_scores, away_scores = simulate_scores(
+            run.samples,
+            run.season,
+            seed=int(run.config.get("seed", 0)) + 2718,
+            max_draws=1000,
+        )
+        curves = _cumulative_points_from_scores(run.season, home_scores, away_scores)
+        simulations[run.name] = (
+            curves.mean(axis=0),
+            np.quantile(curves, 0.05, axis=0),
+            np.quantile(curves, 0.95, axis=0),
+        )
+
+    final_points = observed[:, -1]
+    team_order = np.argsort(-final_points)
+    colors = ["#2c7fb8", "#e34a33"]
+    fig, axes = plt.subplots(4, 5, figsize=(18, 10), sharex=True, sharey=True)
+    game_number = np.arange(1, observed.shape[1] + 1)
+    for axis, team_index in zip(axes.ravel(), team_order, strict=True):
+        axis.plot(
+            game_number,
+            observed[team_index],
+            color="#202020",
+            linewidth=1.6,
+            label="Observed",
+            zorder=4,
+        )
+        for color, run in zip(colors, selected, strict=False):
+            mean, lower, upper = simulations[run.name]
+            axis.fill_between(
+                game_number,
+                lower[team_index],
+                upper[team_index],
+                color=color,
+                alpha=0.09,
+                linewidth=0,
+            )
+            axis.plot(
+                game_number,
+                mean[team_index],
+                color=color,
+                linewidth=1.35,
+                label=run.label,
+                zorder=3,
+            )
+        axis.set_title(season.teams[team_index], fontsize=10)
+        axis.set_xlim(1, observed.shape[1])
+    for axis in axes[-1]:
+        axis.set_xlabel("Team match number")
+    for axis in axes[:, 0]:
+        axis.set_ylabel("Cumulative points")
+    handles, labels = axes[0, 0].get_legend_handles_labels()
+    fig.legend(
+        handles,
+        labels,
+        loc="upper center",
+        bbox_to_anchor=(0.5, 0.955),
+        ncol=len(labels),
+        frameon=False,
+    )
+    fig.suptitle(
+        "Posterior predictive cumulative points through the season",
+        fontsize=15,
+        y=0.992,
+    )
+    fig.tight_layout(rect=(0, 0, 1, 0.90))
+    _save_figure(fig, destination)
+
+
+def _spread_label_positions(
+    values: np.ndarray, lower: float, upper: float, minimum_gap: float
+) -> np.ndarray:
+    """Spread one-dimensional label positions while preserving their order."""
+    order = np.argsort(values)
+    positioned = np.clip(np.asarray(values, dtype=float), lower, upper)[order]
+    for index in range(1, len(positioned)):
+        positioned[index] = max(positioned[index], positioned[index - 1] + minimum_gap)
+    if len(positioned) and positioned[-1] > upper:
+        positioned -= positioned[-1] - upper
+        for index in range(len(positioned) - 2, -1, -1):
+            positioned[index] = min(
+                positioned[index], positioned[index + 1] - minimum_gap
+            )
+    if len(positioned) and positioned[0] < lower:
+        positioned += lower - positioned[0]
+    result = np.empty_like(positioned)
+    result[order] = positioned
+    return result
+
+
+def plot_attack_defence(run: FittedRun, destination: Path) -> None:
+    """Plot posterior mean attack against defence in the paper's Figure 3 style."""
+    plt = _pyplot()
+    attack = np.asarray(run.samples["attack"]).reshape(-1, len(run.teams)).mean(axis=0)
+    defence = np.asarray(run.samples["defence"]).reshape(-1, len(run.teams)).mean(axis=0)
+    fig, axis = plt.subplots(figsize=(10.5, 8.2))
+    axis.scatter(defence, attack, s=58, color="#2166ac", edgecolor="white", linewidth=0.7)
+    y_padding = max((attack.max() - attack.min()) * 0.06, 0.04)
+    y_lower, y_upper = attack.min() - y_padding, attack.max() + y_padding
+    x_padding = max((defence.max() - defence.min()) * 0.08, 0.05)
+    left_label_x = defence.max() + x_padding
+    right_label_x = defence.min() - x_padding
+    groups = (
+        (np.flatnonzero(defence >= 0), left_label_x, "left"),
+        (np.flatnonzero(defence < 0), right_label_x, "right"),
+    )
+    minimum_gap = (y_upper - y_lower) / 24
+    for indices, label_x, alignment in groups:
+        label_y = _spread_label_positions(
+            attack[indices], y_lower, y_upper, minimum_gap
+        )
+        for index, position_y in zip(indices, label_y, strict=True):
+            axis.annotate(
+                run.teams[index],
+                (defence[index], attack[index]),
+                xytext=(label_x, position_y),
+                textcoords="data",
+                ha=alignment,
+                va="center",
+                fontsize=8.2,
+                arrowprops={"arrowstyle": "-", "color": "#999999", "lw": 0.6},
+            )
+    axis.axhline(0, color="#777777", linestyle="--", linewidth=0.9)
+    axis.axvline(0, color="#777777", linestyle="--", linewidth=0.9)
+    axis.set_xlim(defence.min() - 2.6 * x_padding, defence.max() + 2.6 * x_padding)
+    axis.set_ylim(y_lower, y_upper)
+    axis.invert_xaxis()
+    axis.set_xlabel("Defence effect (stronger to the right)")
+    axis.set_ylabel("Attack effect (stronger upward)")
+    axis.set_title(f"Posterior mean attack and defence effects: {run.label}")
+    _save_figure(fig, destination)
+
+
+def _student_t_logpdf(
+    values: np.ndarray, means: np.ndarray, scales: np.ndarray, degrees_of_freedom: float
+) -> np.ndarray:
+    scale = np.clip(scales, 1e-12, None)
+    standard = (values - means) / scale
+    constant = (
+        math.lgamma((degrees_of_freedom + 1.0) / 2.0)
+        - math.lgamma(degrees_of_freedom / 2.0)
+        - 0.5 * math.log(degrees_of_freedom * math.pi)
+    )
+    return (
+        constant
+        - np.log(scale)
+        - ((degrees_of_freedom + 1.0) / 2.0)
+        * np.log1p(np.square(standard) / degrees_of_freedom)
+    )
+
+
+def mixture_component_probabilities(run: FittedRun, parameter: str) -> pd.DataFrame:
+    """Recover posterior group responsibilities from a marginalized mixture fit."""
+    if run.config["model"] != "mixture" or parameter not in {"attack", "defence"}:
+        raise ValueError("Component probabilities require a mixture run and team effect")
+
+    effects = np.asarray(run.samples[parameter]).reshape(-1, len(run.teams))
+    means = np.asarray(run.samples[f"{parameter}_component_means"]).reshape(-1, 3)
+    if f"{parameter}_scale" in run.samples:
+        scales = np.asarray(run.samples[f"{parameter}_scale"]).reshape(-1, 3)
+    else:
+        precision = np.asarray(run.samples[f"{parameter}_precision"]).reshape(-1, 3)
+        scales = np.reciprocal(np.sqrt(np.clip(precision, 1e-12, None)))
+
+    weights = np.asarray(run.samples[f"{parameter}_weights"])
+    if weights.ndim == 3:
+        weights = weights.reshape(-1, 1, 3)
+        weights = np.broadcast_to(weights, (len(effects), len(run.teams), 3))
+    else:
+        weights = weights.reshape(-1, len(run.teams), 3)
+    if not (len(effects) == len(means) == len(scales) == len(weights)):
+        raise ValueError("Mixture posterior arrays have inconsistent draw counts")
+
+    log_density = _student_t_logpdf(
+        effects[:, :, None],
+        means[:, None, :],
+        scales[:, None, :],
+        float(run.config.get("degrees_of_freedom", 4.0)),
+    )
+    log_responsibility = np.log(np.clip(weights, 1e-300, None)) + log_density
+    log_responsibility -= log_responsibility.max(axis=-1, keepdims=True)
+    responsibility = np.exp(log_responsibility)
+    responsibility /= responsibility.sum(axis=-1, keepdims=True)
+    probability = responsibility.mean(axis=0)
+
+    # A lower defence effect means stronger defence, so component quality is
+    # reversed relative to the numerical ordering of the defence means.
+    quality_order = [0, 1, 2] if parameter == "attack" else [2, 1, 0]
+    probability = probability[:, quality_order]
+    return pd.DataFrame(
+        {
+            "team": run.teams,
+            "Bottom": probability[:, 0],
+            "Middle": probability[:, 1],
+            "Top": probability[:, 2],
+        }
+    )
+
+
+def mixture_membership_table(run: FittedRun) -> pd.DataFrame:
+    """Combine attack and defence group probabilities into one export table."""
+    attack = mixture_component_probabilities(run, "attack").set_index("team")
+    defence = mixture_component_probabilities(run, "defence").set_index("team")
+    attack = attack.add_prefix("attack_")
+    defence = defence.add_prefix("defence_")
+    return attack.join(defence).reset_index()
+
+
+def plot_mixture_membership(run: FittedRun, destination: Path) -> None:
+    """Plot posterior group probabilities in the paper's Figure 5 style."""
+    plt = _pyplot()
+    attack = mixture_component_probabilities(run, "attack").set_index("team")
+    defence = mixture_component_probabilities(run, "defence").set_index("team")
+    attack_mean = np.asarray(run.samples["attack"]).reshape(-1, len(run.teams)).mean(axis=0)
+    order = np.asarray(run.teams)[np.argsort(-attack_mean)]
+    colors = {"Bottom": "#d73027", "Middle": "#fdae61", "Top": "#1a9850"}
+
+    fig, axes = plt.subplots(1, 2, figsize=(16, 6), sharey=True)
+    for axis, table, title in zip(
+        axes,
+        (attack.loc[order], defence.loc[order]),
+        ("(a) Attack effect", "(b) Defence effect"),
+        strict=True,
+    ):
+        bottom = np.zeros(len(order))
+        for group in ("Bottom", "Middle", "Top"):
+            values = table[group].to_numpy()
+            axis.bar(order, values, bottom=bottom, color=colors[group],
+                     width=0.86, label=group)
+            bottom += values
+        axis.set_title(title, fontweight="bold")
+        axis.set_ylim(0, 1)
+        axis.tick_params(axis="x", rotation=55, labelsize=8)
+        axis.set_xlabel("Team (ordered by posterior mean attack)")
+    axes[0].set_ylabel("Posterior component probability")
+    axes[1].legend(loc="upper right", frameon=False)
+    fig.suptitle(f"Posterior mixture-group probabilities: {run.label}", fontsize=14)
+    fig.tight_layout()
+    _save_figure(fig, destination)
 
 
 def plot_observed_vs_predicted(runs: list[FittedRun], destination: Path) -> None:
@@ -481,13 +805,30 @@ R-hat, ESS, BFMI, and zero divergent transitions.
 
 - `tables/model_comparison.csv`: one-row-per-model overview / 模型总体比较；
 - `tables/posterior_parameter_summary.csv`: posterior summaries / 参数后验摘要；
+- `tables/paper_point_predictions.csv`: paper-style league point comparison / 论文式积分比较；
+- `tables/mixture_membership_*.csv`: marginalized component probabilities / 边际化组分概率；
 - `diagnostics/convergence_summary.csv`: parameter-level diagnostics / 参数级诊断；
 - `figures/model_comparison.png`: compact comparison dashboard / 模型比较图；
 - `figures/observed_vs_predicted_points.png`: predictive intervals / 积分预测区间；
 - `figures/team_prediction_errors.png`: team-level errors / 球队预测误差；
+- `figures/paper_cumulative_points.png`: 20-team cumulative points / 20 队累积积分；
+- `figures/paper_attack_defence_*.png`: attack-defence plane / 攻防能力平面；
+- `figures/paper_group_probabilities_*.png`: mixture responsibilities / 混合组分概率；
 - `figures/convergence_overview.png`: compact four-chain traces / 四链轨迹总览；
 - `figures/*_effects_*.png`: attack and defence effects / 进攻与防守效应；
 - `figures/trace_*.png` and `figures/rank_*.png`: selected-chain diagnostics / 链诊断。
+
+The three `paper_*` figures follow the visual structure of Figures 2/4, 3, and 5
+in Baio and Blangiardo (2010), but all values are regenerated from the current
+NumPyro fits. Because the mixture allocations are marginalized during NUTS,
+the group-probability figure reports posterior component responsibilities rather
+than sampled discrete labels. The cumulative-points figure uses the tracked CSV
+row order as match order because the course data contain no date column.
+
+三类 `paper_*` 图沿用 Baio 与 Blangiardo（2010）图 2/4、图 3 和图 5 的表达形式，
+但数值全部由当前 NumPyro 拟合重新生成。混合模型在 NUTS 中已经边际化离散类别，
+因此分组图展示的是后验组分责任概率，而不是离散标签的抽样频率。
+由于课程数据没有日期列，累积积分图把仓库中 CSV 的行顺序视为比赛先后顺序。
 """
     destination.write_text(text, encoding="utf-8")
 
@@ -515,15 +856,18 @@ def generate_summary(
     pd.concat([parameter_summary_table(run) for run in runs], ignore_index=True).to_csv(
         parameter_path, index=False
     )
+    paper_points_path = tables_dir / "paper_point_predictions.csv"
+    paper_point_comparison_table(runs).to_csv(paper_points_path, index=False)
     convergence_path = diagnostics_dir / "convergence_summary.csv"
     convergence_table(runs).to_csv(convergence_path, index=False)
 
-    generated = [comparison_path, parameter_path, convergence_path]
+    generated = [comparison_path, parameter_path, paper_points_path, convergence_path]
     common_figures = {
         "model_comparison.png": lambda path: plot_model_comparison(comparison, path),
         "observed_vs_predicted_points.png": lambda path: plot_observed_vs_predicted(runs, path),
         "team_prediction_errors.png": lambda path: plot_prediction_errors(runs, path),
         "convergence_overview.png": lambda path: plot_convergence_overview(runs, path),
+        "paper_cumulative_points.png": lambda path: plot_cumulative_points(runs, path),
     }
     for filename, create in common_figures.items():
         path = figures_dir / filename
@@ -541,6 +885,17 @@ def generate_summary(
         plot_trace(run, trace_path)
         plot_rank(run, rank_path)
         generated.extend([trace_path, rank_path])
+
+        if run.config["model"] == "mixture":
+            membership_path = tables_dir / f"mixture_membership_{suffix}.csv"
+            mixture_membership_table(run).to_csv(membership_path, index=False)
+            attack_defence_path = figures_dir / f"paper_attack_defence_{suffix}.png"
+            membership_figure_path = figures_dir / f"paper_group_probabilities_{suffix}.png"
+            plot_attack_defence(run, attack_defence_path)
+            plot_mixture_membership(run, membership_figure_path)
+            generated.extend(
+                [membership_path, attack_defence_path, membership_figure_path]
+            )
 
     report_path = results / "summary.md"
     write_report(comparison, report_path)
