@@ -27,7 +27,7 @@ in Baio and Blangiardo (2010) using the 2023/24 English Premier League season.
 项目研究三个问题：
 
 1. 基础层次泊松模型能否得到可解释的进攻、防守和主场优势参数？
-2. 三成分重尾混合模型能否更好地描述实力极端的球队？
+2. 三成分重尾混合模型是否改变对实力极端球队的估计？
 3. 样本内拟合的改善能否延续到最后若干轮的样本外预测？
 
 ### 2. 模型概览
@@ -61,7 +61,7 @@ $\text{defence}_t$ 分别是球队 $t$ 相对于联赛平均水平的进攻和�
 项目保留两套相互独立的先验配置：
 
 - `paper_replication`：尽量贴近论文及 BUGS 附录，用于回答论文复现问题；
-- `modernized`：使用非中心化参数和正则化尺度先验，是新分析的推荐配置。
+- `modernized`：使用非中心化参数和正则化尺度先验，用于比较现代参数化的影响。
 
 ### 3. 项目结构
 
@@ -90,9 +90,8 @@ bayesian-football-replication/
 
 ### 4. 在 VS Code 中完整复现
 
-以下步骤以项目根目录 `bayesian-football-replication` 为起点。推荐使用 `uv`，因为
-`uv.lock` 能锁定实际使用的依赖版本。Windows、macOS 和 Linux 均可执行同一组
-`uv run` 命令。
+以下步骤以项目根目录 `bayesian-football-replication` 为起点。项目通过 `uv.lock`
+固定依赖版本；Windows、macOS 和 Linux 均可执行同一组 `uv run` 命令。
 
 #### 4.1 安装准备
 
@@ -100,7 +99,7 @@ bayesian-football-replication/
 
 - Git；
 - Visual Studio Code；
-- Python 3.10–3.12，推荐 Python 3.11 或 3.12；
+- Python 3.10–3.12；
 - VS Code 的 Microsoft Python 扩展；
 - 可选：Jupyter 扩展，用于以后查看 Notebook。
 
@@ -114,7 +113,7 @@ python -m pip install uv
 
 1. 启动 VS Code。
 2. 选择 `File → Open Folder`。
-3. 打开 `bayesian-football-replication`，不要打开外层旧项目目录。
+3. 打开包含 `README.md`、`pyproject.toml` 和 `uv.lock` 的仓库根目录。
 4. 使用 ``Ctrl+` `` 打开 VS Code 集成终端。
 5. 确认终端当前位置包含 `README.md`、`pyproject.toml` 和 `uv.lock`。
 
@@ -236,7 +235,7 @@ uv run python scripts/run_model.py --config configs/mixture_paper_replication.ya
 
 这两组结果用于讨论论文模型本身，包括宽先验、混合分布和计算困难。
 
-#### 4.8 运行推荐的现代化模型
+#### 4.8 运行现代化配置
 
 运行现代化基础模型：
 
@@ -250,8 +249,8 @@ uv run python scripts/run_model.py --config configs/basic_modernized.yaml
 uv run python scripts/run_model.py --config configs/mixture_modernized.yaml
 ```
 
-正式配置使用四条链。混合模型计算量较大，在纯 CPU 环境中可能需要较长时间。
-请让终端保持运行，不要在采样中途关闭 VS Code。
+正式配置使用四条链。混合模型计算量较大，在纯 CPU 环境中可能需要较长时间；
+采样完成前需保持终端进程运行。
 
 #### 4.9 运行最后六轮留出预测
 
@@ -282,7 +281,7 @@ uv run python scripts/run_holdout.py --config configs/holdout_modernized.yaml
 正式结果应至少满足以下检查：
 
 - divergence 数量为 0；
-- rank-normalized R-hat 尽量不超过 1.01，超过时必须检查轨迹和多峰问题；
+- rank-normalized R-hat 通常不超过 1.01；超过时结合轨迹图与多峰性进一步检查；
 - 所有用于结论的参数具有足够的 bulk ESS 与 tail ESS；
 - 每条链的 BFMI 没有明显异常；
 - 论文复现结果和现代化结果使用相同数据后再比较；
@@ -345,7 +344,7 @@ uv run python scripts/run_model.py --config configs/mixture_paper_replication.ya
 uv run python scripts/summarize_results.py
 ```
 
-最后一条命令必须在两次正式拟合完成后执行。成功时终端会显示
+最后一条命令在两次正式拟合完成后执行。成功时终端会显示
 `Generated 16 summary files from 2 fitted runs.`。随后打开 `results/summary.md`，并确认
 `results/figures/` 中存在 `convergence_overview.png`、两个 `trace_*.png` 和两个
 `rank_*.png`。`quick_smoke` 只有一条链，只能验证代码能够运行，不能生成有意义的
@@ -368,8 +367,8 @@ results/figures/rank_mixture_paper_replication.png
 
 #### VS Code 找不到模块
 
-重新执行 `Python: Select Interpreter` 并选择项目的 `.venv`。终端命令优先使用
-`uv run python ...`，不要使用系统环境中另一个同名的 Python。
+重新执行 `Python: Select Interpreter` 并选择项目的 `.venv`。终端命令使用
+`uv run python ...`，以确保调用锁定环境中的解释器。
 
 #### JAX 首次运行较慢
 
@@ -377,8 +376,8 @@ results/figures/rank_mixture_paper_replication.png
 
 #### 内存或运行时间不足
 
-不要直接修改模型代码。先复制一个 YAML 配置，减少 `warmup`、`samples` 或
-`chains` 进行调试。用于最终结论时必须恢复正式配置，并重新检查诊断。
+资源受限时，可复制一个 YAML 配置并减少 `warmup`、`samples` 或 `chains` 进行
+调试。正式分析仍使用四链配置，并重新检查采样诊断。
 
 #### Windows 终端无法激活 `.venv`
 
@@ -409,8 +408,8 @@ The two prior profiles have different purposes:
 
 - `paper_replication` follows the published paper and BUGS appendix as closely
   as practical;
-- `modernized` uses non-centred effects and regularising scale priors and is the
-  recommended profile for new analysis.
+- `modernized` uses non-centred effects and regularising scale priors to assess
+  the effect of a contemporary parameterisation.
 
 ### 2. Repository structure
 
@@ -433,7 +432,7 @@ uv.lock                  Locked reproducible environment
 #### 3.1 Prerequisites
 
 Install Git, Visual Studio Code, Python 3.10–3.12, the Microsoft Python extension,
-and optionally the Jupyter extension. Python 3.11 or 3.12 is recommended.
+and optionally the Jupyter extension.
 
 Install `uv` if it is not already available:
 
@@ -469,8 +468,8 @@ uv run python -c "import jax, numpyro, arviz; print(jax.__version__, numpyro.__v
 uv run python scripts/validate_data.py
 ```
 
-The command must report 380 matches and 20 teams. The generated on-field table
-must give Manchester City 91 points. These are points earned from match results
+The expected output reports 380 matches and 20 teams. The generated on-field table
+gives Manchester City 91 points. These are points earned from match results
 before administrative deductions.
 
 #### 3.5 Run tests and linting
@@ -493,8 +492,8 @@ uv run python scripts/run_holdout.py --config configs/holdout_quick_smoke.yaml
 ```
 
 Smoke configurations use one short chain and only establish that the complete
-pipeline works. R-hat is intentionally unavailable and the numerical estimates
-must not be reported as research results.
+pipeline works. R-hat is unavailable, and these numerical estimates are not used
+for substantive analysis.
 
 #### 3.7 Run the full paper-style replication
 
@@ -503,7 +502,7 @@ uv run python scripts/run_model.py --config configs/basic_paper_replication.yaml
 uv run python scripts/run_model.py --config configs/mixture_paper_replication.yaml
 ```
 
-#### 3.8 Run the recommended modernized analysis
+#### 3.8 Run the modernized specifications
 
 ```bash
 uv run python scripts/run_model.py --config configs/basic_modernized.yaml
@@ -558,7 +557,7 @@ uv run python scripts/summarize_results.py --runs results/basic_paper_replicatio
 
 The trace and rank figures deliberately show a small set of interpretable latent
 parameters rather than hundreds of match-level deterministic quantities. Visual
-inspection must be combined with R-hat, ESS, divergences, and BFMI.
+inspection is interpreted together with R-hat, ESS, divergences, and BFMI.
 
 #### 3.11 Shortest clean-clone reproduction path
 
@@ -573,7 +572,7 @@ uv run python scripts/run_model.py --config configs/mixture_paper_replication.ya
 uv run python scripts/summarize_results.py
 ```
 
-The last command must run after both four-chain fits have completed. It should
+The last command runs after both four-chain fits have completed. It should
 report `Generated 16 summary files from 2 fitted runs.`. Open
 `results/summary.md`, then verify that `results/figures/` contains the compact
 convergence overview, two detailed trace plots, and two rank plots. Single-chain

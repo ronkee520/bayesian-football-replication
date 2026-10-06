@@ -2,10 +2,15 @@
 
 ## Environment
 
-Use Python 3.10 or 3.11 in a fresh virtual environment and install the project
-with `python -m pip install -e ".[dev]"`. The supported dependency ranges are in
-`pyproject.toml`. Before the final public release, create a lock file on the
-target operating system and record the JAX backend in each result bundle.
+Use Python 3.10–3.12 and recreate the locked environment with:
+
+```bash
+uv sync --extra dev --frozen
+```
+
+Dependency ranges are declared in `pyproject.toml`; exact resolved versions are
+stored in `uv.lock`. Each result directory records the model configuration and
+random seed.
 
 ## Data controls
 
@@ -18,12 +23,12 @@ target operating system and record the JAX backend in each result bundle.
 ## Model runs
 
 Every run is controlled by a tracked YAML file. The workflow copies the resolved
-configuration into the result directory, including the random seed. Do not edit
-a result table by hand. Change the model, configuration, or reporting code and
-rerun the pipeline.
+configuration into the result directory, including the random seed. Changes to
+results are made through the model, configuration, or reporting code and then
+regenerated.
 
-The quick smoke configuration is only a functional test. It is too short for
-substantive inference. Final conclusions require the full four-chain settings.
+The quick smoke configuration is a functional test and is not used for inference.
+Reported estimates use the full four-chain settings.
 
 ## Acceptance checks for a final run
 
@@ -33,14 +38,14 @@ substantive inference. Final conclusions require the full four-chain settings.
 - BFMI and energy plots checked by chain;
 - trace plots and posterior predictive checks visually reviewed;
 - conclusions stable across seeds or explained when mixture modes differ;
-- full-season model checking clearly separated from held-out forecasting.
+- separate reporting for full-season model checks and held-out forecasts.
 
 ## Release checklist
 
-1. Run `pytest -m "not slow"` and `ruff check .`.
-2. Run the two optional MCMC smoke tests.
+1. Run `uv run pytest` and `uv run ruff check .`.
+2. Run the end-to-end smoke configurations.
 3. Generate full basic, mixture, and holdout results.
 4. Add final figures and tables to a versioned release or archive rather than
    committing large posterior arrays to Git.
-5. Record package versions with `python -m pip freeze`.
+5. Retain `uv.lock` and record the JAX backend with the release notes.
 6. Review all paths and commands from a fresh clone.

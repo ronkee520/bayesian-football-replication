@@ -9,11 +9,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v9
         with:
+          version: "0.11.13"
+          enable-cache: true
           python-version: "3.11"
-          cache: pip
-      - run: python -m pip install --upgrade pip
-      - run: python -m pip install -e ".[dev]"
-      - run: pytest -m "not slow"
-      - run: ruff check .
+      - run: uv sync --extra dev --frozen
+      - run: uv run pytest -m "not slow"
+      - run: uv run ruff check .

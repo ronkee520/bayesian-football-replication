@@ -31,7 +31,6 @@ By default, this excludes all `quick_smoke` directories and creates:
 for reviewing the run. The per-model `trace_*.png` and `rank_*.png` files provide
 the detailed convergence views.
 
-This directory is intentionally empty in a fresh clone, apart from this README
-and `.gitkeep` placeholders. All posterior archives, summary tables, and figures
-are ignored by Git and must be generated locally from the tracked data, code,
-and configurations.
+A fresh clone contains only this README and `.gitkeep` placeholders. Posterior
+archives, summary tables, and figures are ignored by Git and are generated locally
+from the tracked data, code, and configurations.

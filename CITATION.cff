@@ -3,7 +3,7 @@ message: "If you use this repository, please cite both this software and Baio & 
 title: "Bayesian Football Model Replication"
 type: software
 version: 0.1.0
-date-released: 2026-10-04
+date-released: 2026-10-06
 authors:
   - name: ronkee520
 preferred-citation:

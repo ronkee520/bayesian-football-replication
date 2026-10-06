@@ -2,14 +2,14 @@
 
 ## Paper-to-code mapping
 
-The project follows Baio and Blangiardo (2010), but keeps two goals separate:
+The implementation follows Baio and Blangiardo (2010) while separating two specifications:
 
 - reproduce the published model assumptions;
-- build a stable contemporary implementation for new analysis.
+- evaluate a contemporary parameterisation under the same score likelihood.
 
-`paper_replication` is therefore not silently treated as the recommended model.
-`modernized` changes priors and parameterisation while preserving the score
-likelihood and substantive interpretation.
+`paper_replication` records the paper-oriented assumptions. `modernized` changes
+the priors and parameterisation while preserving the score likelihood and the
+interpretation of team effects.
 
 ## Source discrepancies recorded explicitly
 
@@ -24,16 +24,17 @@ normal level. Fixing the middle component gives a clear weak/middle/strong ancho
 
 The paper's Section 2 illustration uses Serie A 1991/92. Section 4 re-fits both
 the basic and mixture models to Serie A 2007/08 for the comparison in Table 3.
-The two models can and should be compared on the same EPL data in this project.
+Both models are compared on the same EPL data in this repository.
 
-## Deliberate modernizations
+## Implementation differences
 
 - NumPyro NUTS replaces hand-written random-walk Metropolis algorithms.
 - Discrete mixture allocations are marginalized.
 - The modernized basic model uses symmetric non-centred team effects.
 - Regularising Half-Normal scale priors replace diffuse Gamma precision priors.
 - Diagnostics come from ArviZ and include rank-normalized R-hat and bulk/tail ESS.
-- Forecast claims require a time-ordered holdout, not full-season re-prediction.
+- Forecast performance is evaluated with a time-ordered holdout rather than
+  full-season re-prediction.
 
 ## Interpretation cautions
 

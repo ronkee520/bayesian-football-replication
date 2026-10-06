@@ -1,6 +1,6 @@
 # Verification record
 
-Verification date: 2026-10-05
+Verification date: 2026-10-06
 
 ## Automated checks
 
@@ -25,9 +25,8 @@ zero divergences. The held-out smoke run completed with outcome accuracy 0.617
 and a three-class Brier score of 0.536.
 
 These values are functional checks only. The smoke configurations use one short
-chain, so R-hat is undefined and the reported accuracy is too noisy for a
-substantive conclusion. Portfolio results must be regenerated using the full
-four-chain configurations and reviewed under `docs/reproducibility.md`.
+chain, so R-hat is undefined and the reported accuracy is not used for inference.
+Four-chain runs are assessed under `docs/reproducibility.md`.
 
 ## Automated reporting
 
