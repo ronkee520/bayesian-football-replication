@@ -83,7 +83,7 @@ Student-t 比正态分布尾部更厚，更愿意容纳极端球队。弱、中�
 参数：
 
 $$
-\log p(a_t)=\operatorname{logsumexp}_k
+\log p(a_t)=\mathrm{logsumexp}_k
 \{\log\pi_k+\log p(a_t\mid k)\}.
 $$
 

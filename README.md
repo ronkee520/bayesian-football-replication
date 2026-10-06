@@ -35,8 +35,8 @@ in Baio and Blangiardo (2010) using the 2023/24 English Premier League season.
 对于比赛 $g$，主队和客队进球分别建模为：
 
 $$
-y_{g,h}\sim\operatorname{Poisson}(\theta_{g,h}),\qquad
-y_{g,a}\sim\operatorname{Poisson}(\theta_{g,a}).
+y_{g,h}\sim\mathrm{Poisson}(\theta_{g,h}),\qquad
+y_{g,a}\sim\mathrm{Poisson}(\theta_{g,a}).
 $$
 
 基础模型使用：
